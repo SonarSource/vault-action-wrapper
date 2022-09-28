@@ -1,0 +1,63 @@
+---
+name: Wrapper for hashicorp/vault-action
+author: Malena Ebert
+description: Simplifies the usage of hashicorp/vault-action
+branding:
+  color: green
+  icon: lock
+inputs:
+  url:
+    description: url of the HC vault instance
+    default: https://vault.sonar.build:8200
+    required: false
+  secrets:
+    description: pattern to fetch secrets
+    required: true
+outputs:
+  vault:
+    description: Outputs of vault
+    value: ${{ toJSON(steps.secrets.outputs) }}
+runs:
+  using: composite
+  steps:
+    - name: replace placeholder
+      id: replace
+      # GITHUB_REPOSITORY=octocat/Hello-World
+      # GITHUB_REPOSITORY_OWNER=octocat
+      # REPO_NAME=Hello-World
+      # REPO_OWNER_NAME_DASH=octocat-Hello-World
+      env:
+        SECRET_PATTERN: ${{ inputs.secrets }}
+      uses: actions/github-script@d4560e157075e2d93aa3022b5b51a42a880f1f93 # tag=v6.3.0
+      with:
+        script: |
+          core.setOutput('pattern',
+            process.env.SECRET_PATTERN
+              .replace(
+                'GITHUB_REPOSITORY_OWNER',
+                context.repo.owner
+              )
+              .replace(
+                'GITHUB_REPOSITORY',
+                `${context.repo.owner}/${context.repo.repo}`
+              )
+              .replace(
+                'REPO_OWNER_NAME_DASH',
+                `${context.repo.owner}-${context.repo.repo}`
+              )
+              .replace(
+                'REPO_NAME',
+                context.repo.repo
+              )
+          );
+          core.setOutput('vault-role', `github-${context.repo.owner}-${context.repo.repo}`)
+    - name: Vault Secrets
+      id: secrets
+      uses: hashicorp/vault-action@7d98524254c38dc6892804f991526ff30905f643 # tag=v2.4.2
+      with:
+        url: ${{ inputs.url }}
+        exportEnv: false
+        method: jwt
+        path: jwt-ghwf
+        role: ${{ steps.replace.outputs.vault-role }}
+        secrets: ${{ steps.replace.outputs.pattern }}
