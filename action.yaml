@@ -53,7 +53,7 @@ runs:
           core.setOutput('vault-role', `github-${context.repo.owner}-${context.repo.repo}`)
     - name: Vault Secrets
       id: secrets
-      uses: hashicorp/vault-action@7d98524254c38dc6892804f991526ff30905f643 # tag=v2.4.2
+      uses: hashicorp/vault-action@8fa61e909919a3f94952e9e07ace6b5a1114440b # tag=v2.4.3
       with:
         url: ${{ inputs.url }}
         exportEnv: false
