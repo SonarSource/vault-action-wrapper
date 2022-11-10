@@ -28,7 +28,7 @@ runs:
       # REPO_OWNER_NAME_DASH=octocat-Hello-World
       env:
         SECRET_PATTERN: ${{ inputs.secrets }}
-      uses: actions/github-script@d4560e157075e2d93aa3022b5b51a42a880f1f93 # tag=v6.3.0
+      uses: actions/github-script@d556feaca394842dc55e4734bf3bb9f685482fa0 # v6.3.3
       with:
         script: |
           core.setOutput('pattern',
