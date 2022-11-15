@@ -30,3 +30,33 @@ where `name` is the variable at the end of every line of the secrets
 
 For further information, see
 [HashiCorp Vault GitHub Action](https://github.com/hashicorp/vault-action).
+
+## examples
+
+### sonarcloud scan
+
+```yaml
+jobs:
+  sonarcloud:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write     # OIDC auth for vault
+      contents: read      # checkout
+      pull-requests: read # sonarcloud scan
+    steps:
+      - uses: actions/checkout@<lookup latest version>
+        with:
+          fetch-depth: 0
+      - id: secrets
+        uses: SonarSource/vault-action-wrapper@<lookup latest version>
+        with:
+          secrets: |
+            development/kv/data/sonarcloud token | sonarcloud_token;
+      - uses: SonarSource/sonarcloud-github-action@<lookup latest version>
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # provided by the GitHub runner
+          SONAR_TOKEN: ${{ fromJSON(steps.secrets.outputs.vault).sonarcloud_token }}
+```
+
+### realworld examples
+* https://github.com/search?q=org%3ASonarSource+SonarSource%2Fvault-action-wrapper+path%3A%2F%5E.github%5C%2Fworkflows%2F+&type=code&l=.github%2F
