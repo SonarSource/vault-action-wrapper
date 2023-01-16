@@ -28,6 +28,17 @@ The secrets can be accessed via `fromJSON(steps.secrets.outputs.vault).name`,
 where `name` is the variable at the end of every line of the secrets
 (`jf_access_token` in the above example).
 
+### Permissions
+The action is using OIDC to authenticate. This requires write permissions for `id-token` to fetch a JWT.
+
+```yaml
+jobs:
+  foo:
+    permissions:
+      id-token: write
+      ...
+```
+
 For further information, see
 [HashiCorp Vault GitHub Action](https://github.com/hashicorp/vault-action).
 
