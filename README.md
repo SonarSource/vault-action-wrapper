@@ -63,9 +63,10 @@ jobs:
         with:
           secrets: |
             development/kv/data/sonarcloud token | sonarcloud_token;
+            development/github/token/{REPO_OWNER_NAME_DASH}-ro token | GITHUB_TOKEN;
       - uses: SonarSource/sonarcloud-github-action@<lookup latest version>
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # provided by the GitHub runner
+          GITHUB_TOKEN: ${{ fromJSON(steps.secrets.outputs.vault).GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ fromJSON(steps.secrets.outputs.vault).sonarcloud_token }}
 ```
 
