@@ -71,3 +71,17 @@ jobs:
 
 ### real-world examples
 * https://github.com/search?q=org%3ASonarSource+vault-action-wrapper+path%3A%2F.github%2Fworkflows%2F&type=code
+
+## FAQ
+
+### Error: You must provide a valid path and key. Input "some/path/to/secret | ..."
+This error can be raised for multiple reasons:
+* the requested secret is wrongly written or does not exist
+* the repository is not granted access to this secret by the RE-team
+  
+  Due to security reason, the Vault will not tell it knows something about a
+  secret if the user is not granted to reach it.
+
+### Timeout error
+Such error could be raised in case the Vault instance is unreachable.
+
