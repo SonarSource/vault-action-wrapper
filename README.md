@@ -73,23 +73,15 @@ jobs:
 * https://github.com/search?q=org%3ASonarSource+vault-action-wrapper+path%3A%2F.github%2Fworkflows%2F&type=code
 
 ## FAQ
-### Q1: What if the requested secret is wrongly written or does not exist ?
-The step will fail with an error similar to this:
-```
-Error: You must provide a valid path and key. Input: "some/path/to/secret | ..."
-```
 
-### Q2: What happens when the current repository try to access a secret but has not Vault policy allowing that ?
-Imagine you have a repository and want to use jira API in your workflow.`/some/path/jira | jira-api-token`
+### Error: You must provide a valid path and key. Input "some/path/to/secret | ..."
+This error can be raised for multiple reasons:
+* the requested secret is wrongly written or does not exist
+* the repository is not granted access to this secret by the RE-team
+  
+  Due to security reason, the Vault will not tell it knows something about a
+  secret if the user is not granted to reach it.
 
-If the repository was not granted access to it by the RE-team then the following error would pop:
-```
-Error: You must provide a valid path and key. Input: "some/path/to/secret | ..."
-```
+### Timeout error
+Such error could be raised in case the Vault instance is unreachable.
 
-Same as it question Q1. This is due to security reason, the Vault will not tell it knows something about this
-secret if you are not granted to reach it.
-
-### Q3: What happens if the Vault instance is unreachable ?
-
-> Timeout error
