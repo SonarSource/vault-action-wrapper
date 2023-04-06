@@ -70,7 +70,7 @@ jobs:
 ```
 
 ### real-world examples
-* https://github.com/search?q=org%3ASonarSource+vault-action-wrapper+path%3A%2F.github%2Fworkflows%2F&type=code
+* https://github.com/search?q=org%3ASonarSource+vault-action-wrapper+path%3A.github%2Fworkflows%2F&type=code
 
 ## FAQ
 
@@ -85,3 +85,5 @@ This error can be raised for multiple reasons:
 ### Timeout error
 Such error could be raised in case the Vault instance is unreachable.
 
+### Error: Unable to get ACTIONS_ID_TOKEN_REQUEST_URL env variable
+`id-token: write` permission is missing.
