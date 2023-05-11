@@ -24,10 +24,14 @@ jobs:
           url: https://vault.staging.sonar.build:8200
           secrets: |
             development/github/token/{REPO_OWNER_NAME_DASH}-ro token | github_ro;
-      - name: validate
+            development/github/token/{REPO_OWNER_NAME_DASH}-ro org_name | org_name;
+      - name: validate token
         shell: bash
         env:
           GITHUB_TOKEN: ${{ fromJSON(steps.actual.outputs.vault).github_ro }}
         run: |
           gh workflow list --all | grep "Test action"
-          exit $?
+      - name: validate org_name
+        shell: bash
+        run: |
+          [[ "${{ fromJSON(steps.actual.outputs.vault).org_name }}" = "SonarSource" ]]
