@@ -33,19 +33,19 @@ runs:
         script: |
           core.setOutput('pattern',
             process.env.SECRET_PATTERN
-              .replace(
+              .replaceAll(
                 '{GITHUB_REPOSITORY_OWNER}',
                 context.repo.owner
               )
-              .replace(
+              .replaceAll(
                 '{GITHUB_REPOSITORY}',
                 `${context.repo.owner}/${context.repo.repo}`
               )
-              .replace(
+              .replaceAll(
                 '{REPO_OWNER_NAME_DASH}',
                 `${context.repo.owner}-${context.repo.repo}`
               )
-              .replace(
+              .replaceAll(
                 '{REPO_NAME}',
                 context.repo.repo
               )
