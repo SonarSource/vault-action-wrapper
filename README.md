@@ -2,14 +2,14 @@
 
 Ease the usage of hashicorp/vault-action within Sonar
 
-## usage
+## Usage
 
 This wrapper will select <https://vault.sonar.build:8200> automatically.
 
 ```yaml
 - name: get secrets
   id: secrets
-  uses: SonarSource/vault-action-wrapper@ref...
+  uses: SonarSource/vault-action-wrapper@v2
   with:
     secrets: |
       development/artifactory/token/{REPO_OWNER_NAME_DASH}-test access_token | jf_access_token;
@@ -42,34 +42,35 @@ jobs:
 For further information, see
 [HashiCorp Vault GitHub Action](https://github.com/hashicorp/vault-action).
 
-## examples
+## Examples
 
-### sonarcloud scan
+### SonarCloud Scan
 
 ```yaml
 jobs:
   sonarcloud:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write     # OIDC auth for vault
-      contents: read      # checkout
-      pull-requests: read # sonarcloud scan
+      id-token: write     # required by SonarSource/vault-action-wrapper
+      contents: read      # required by actions/checkout
+      pull-requests: read # required by SonarSource/sonarcloud-github-action
     steps:
-      - uses: actions/checkout@<lookup latest version>
+      - uses: actions/checkout@v4
         with:
+          # Disabling shallow clone is recommended for improving relevancy of reporting
           fetch-depth: 0
       - id: secrets
-        uses: SonarSource/vault-action-wrapper@<lookup latest version>
+        uses: SonarSource/vault-action-wrapper@v2
         with:
           secrets: |
             development/kv/data/sonarcloud token | sonarcloud_token;
-      - uses: SonarSource/sonarcloud-github-action@<lookup latest version>
+      - uses: SonarSource/sonarcloud-github-action@master
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # provided by the GitHub runner
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ fromJSON(steps.secrets.outputs.vault).sonarcloud_token }}
 ```
 
-### real-world examples
+### Real-world examples
 * https://github.com/search?q=org%3ASonarSource+vault-action-wrapper+path%3A.github%2Fworkflows%2F&type=code
 
 ## FAQ
@@ -78,7 +79,7 @@ jobs:
 This error can be raised for multiple reasons:
 * the requested secret is wrongly written or does not exist
 * the repository is not granted access to this secret by the RE-team
-  
+
   Due to security reason, the Vault will not tell it knows something about a
   secret if the user is not granted to reach it.
 
@@ -87,3 +88,8 @@ Such error could be raised in case the Vault instance is unreachable.
 
 ### Error: Unable to get ACTIONS_ID_TOKEN_REQUEST_URL env variable
 `id-token: write` permission is missing.
+
+## Releasing
+
+- Create a release on GitHub. For the tag and name check the version of hashicorp/vault-action in action.yaml. If the version is v2.7.3 then this project should be tagged 2.7.3-1.
+- Update the v2 branch to the newly created tag.
