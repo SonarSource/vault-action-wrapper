@@ -1,3 +1,4 @@
+# yamllint disable rule:line-length
 ---
 name: Wrapper for hashicorp/vault-action
 author: Malena Ebert
@@ -15,7 +16,10 @@ inputs:
     required: true
 outputs:
   vault:
-    description: Outputs of vault
+    description: |
+      Outputs of vault
+
+      deprecated: Use the individual outputs instead
     value: ${{ toJSON(steps.secrets.outputs) }}
 runs:
   using: composite
@@ -28,7 +32,7 @@ runs:
       # REPO_OWNER_NAME_DASH=octocat-Hello-World
       env:
         SECRET_PATTERN: ${{ inputs.secrets }}
-      uses: actions/github-script@d7906e4ad0b1822421a7e6a35d5ca353c962f410 # v6.4.1
+      uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea  # v7.0.1
       with:
         script: |
           core.setOutput('pattern',
@@ -53,7 +57,7 @@ runs:
           core.setOutput('vault-role', `github-${context.repo.owner}-${context.repo.repo}`)
     - name: Vault Secrets
       id: secrets
-      uses: hashicorp/vault-action@affa6f04da5c2d55e6e115b7d1b044a6b1af8c74 # v2.7.4
+      uses: hashicorp/vault-action@affa6f04da5c2d55e6e115b7d1b044a6b1af8c74  # v2.7.4
       with:
         url: ${{ inputs.url }}
         exportEnv: false
@@ -61,3 +65,13 @@ runs:
         path: jwt-ghwf
         role: ${{ steps.replace.outputs.vault-role }}
         secrets: ${{ steps.replace.outputs.pattern }}
+    - name: outputs
+      uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea  # v7.0.1
+      env:
+        SECRETS: ${{ toJSON(steps.secrets.outputs) }}
+      with:
+        script: |
+          const secrets = JSON.parse(process.env.SECRETS);
+          for (const [key, value] of Object.entries(secrets)) {
+            core.setOutput(key, value);
+          }
