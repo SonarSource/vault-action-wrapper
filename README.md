@@ -89,6 +89,11 @@ Such error could be raised in case the Vault instance is unreachable.
 ### Error: Unable to get ACTIONS_ID_TOKEN_REQUEST_URL env variable
 `id-token: write` permission is missing.
 
-## Releasing
+## Release
+Create a release from a maintained branches, then update the v* shortcut:
 
-- Update the v3 branch to the newly created tag.
+```
+git fetch --tags
+git update-ref -m "reset: update branch v3 to tag 3.0.0" refs/heads/v3 3.0.0
+git push origin v3
+```
