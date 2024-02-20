@@ -9,7 +9,7 @@ This wrapper will select <https://vault.sonar.build:8200> automatically.
 ```yaml
 - name: get secrets
   id: secrets
-  uses: SonarSource/vault-action-wrapper@v2
+  uses: SonarSource/vault-action-wrapper@v3
   with:
     secrets: |
       development/artifactory/token/{REPO_OWNER_NAME_DASH}-test access_token | jf_access_token;
@@ -60,7 +60,7 @@ jobs:
           # Disabling shallow clone is recommended for improving relevancy of reporting
           fetch-depth: 0
       - id: secrets
-        uses: SonarSource/vault-action-wrapper@v2
+        uses: SonarSource/vault-action-wrapper@v3
         with:
           secrets: |
             development/kv/data/sonarcloud token | sonarcloud_token;
@@ -89,6 +89,11 @@ Such error could be raised in case the Vault instance is unreachable.
 ### Error: Unable to get ACTIONS_ID_TOKEN_REQUEST_URL env variable
 `id-token: write` permission is missing.
 
-## Releasing
+## Release
+Create a release from a maintained branches, then update the v* shortcut:
 
-- Update the v2 branch to the newly created tag.
+```
+git fetch --tags
+git update-ref -m "reset: update branch v3 to tag 3.0.0" refs/heads/v3 3.0.0
+git push origin v3
+```
