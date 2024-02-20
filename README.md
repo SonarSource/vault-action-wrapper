@@ -91,5 +91,4 @@ Such error could be raised in case the Vault instance is unreachable.
 
 ## Releasing
 
-- Create a release on GitHub. For the tag and name check the version of hashicorp/vault-action in action.yaml. If the version is v2.7.3 then this project should be tagged 2.7.3-1.
 - Update the v2 branch to the newly created tag.
