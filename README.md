@@ -29,7 +29,9 @@ where `name` is the variable at the end of every line of the secrets
 (`jf_access_token` in the above example).
 
 ### Permissions
-The action is using OIDC to authenticate. This requires write permissions for `id-token` to fetch a JWT.
+
+The action is using OIDC to authenticate.
+This requires write permissions for `id-token` to fetch a JWT.
 
 ```yaml
 jobs:
@@ -71,12 +73,15 @@ jobs:
 ```
 
 ### Real-world examples
-* https://github.com/search?q=org%3ASonarSource+vault-action-wrapper+path%3A.github%2Fworkflows%2F&type=code
+
+* [View usage within SonarSource GitHub Organization](https://github.com/search?q=org%3ASonarSource+vault-action-wrapper+path%3A.github%2Fworkflows%2F&type=code)
 
 ## FAQ
 
 ### Error: You must provide a valid path and key. Input "some/path/to/secret | ..."
+
 This error can be raised for multiple reasons:
+
 * the requested secret is wrongly written or does not exist
 * the repository is not granted access to this secret by the RE-team
 
@@ -84,15 +89,18 @@ This error can be raised for multiple reasons:
   secret if the user is not granted to reach it.
 
 ### Timeout error
+
 Such error could be raised in case the Vault instance is unreachable.
 
 ### Error: Unable to get ACTIONS_ID_TOKEN_REQUEST_URL env variable
+
 `id-token: write` permission is missing.
 
 ## Release
+
 Create a release from a maintained branches, then update the v* shortcut:
 
-```
+```bash
 git fetch --tags
 git update-ref -m "reset: update branch v3 to tag 3.0.0" refs/heads/v3 3.0.0
 git push origin v3
