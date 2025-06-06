@@ -61,3 +61,11 @@ runs:
         path: jwt-ghwf
         role: ${{ steps.replace.outputs.vault-role }}
         secrets: ${{ steps.replace.outputs.pattern }}
+
+    - name: Mask all vault secrets
+      shell: bash
+      run: |
+        secrets_json='${{ steps.secrets.outputs.vault }}'
+        jq -r 'to_entries[] | "::add-mask::\(.value)"' <<< "$secrets_json" | while read maskcmd; do
+          echo "$maskcmd"
+        done
