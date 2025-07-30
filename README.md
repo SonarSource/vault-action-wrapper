@@ -4,7 +4,7 @@ Ease the usage of hashicorp/vault-action within Sonar
 
 ## Usage
 
-This wrapper will select <https://vault.sonar.build:8200> automatically.
+This wrapper will select <https://vault.sonar.build> automatically.
 
 ```yaml
 - name: get secrets
@@ -57,7 +57,7 @@ jobs:
       contents: read      # required by actions/checkout
       pull-requests: read # required by SonarSource/sonarcloud-github-action
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           # Disabling shallow clone is recommended for improving relevancy of reporting
           fetch-depth: 0
@@ -66,7 +66,7 @@ jobs:
         with:
           secrets: |
             development/kv/data/sonarcloud token | sonarcloud_token;
-      - uses: SonarSource/sonarcloud-github-action@master
+      - uses: SonarSource/sonarcloud-github-action@ffc3010689be73b8e5ae0c57ce35968afd7909e8 # v5.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ fromJSON(steps.secrets.outputs.vault).sonarcloud_token }}

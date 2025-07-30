@@ -8,7 +8,7 @@ branding:
 inputs:
   url:
     description: url of the HC vault instance
-    default: https://vault.sonar.build:8200
+    default: https://vault.sonar.build
     required: false
   secrets:
     description: pattern to fetch secrets
