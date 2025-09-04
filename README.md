@@ -12,21 +12,54 @@ This wrapper will select <https://vault.sonar.build> automatically.
   uses: SonarSource/vault-action-wrapper@v3
   with:
     secrets: |
-      development/artifactory/token/{REPO_OWNER_NAME_DASH}-test access_token | jf_access_token;
-- run: login-command ${{ fromJSON(steps.secrets.outputs.vault).jf_access_token }}
+      development/artifactory/token/${{ github.repository_owner }}-${{ github.event.repository.name }}-test
+        access_token |
+        jf_access_token;
+- name: use secrets
+  env:
+    JF_ACCESS_TOKEN: ${{ steps.secrets.outputs.jf_access_token }}
+  run: echo "scripts can use $JF_ACCESS_TOKEN"
 ```
 
-The `secrets` parameter will be pre-processed before passing it to the
-`vault-action`. The following placeholders will be replaced:
+### Secret Path Patterns
 
-* `{GITHUB_REPOSITORY}` => `octocat/Hello-World`
-* `{GITHUB_REPOSITORY_OWNER}` => `octocat`
-* `{REPO_NAME}` => `Hello-World`
-* `{REPO_OWNER_NAME_DASH}` => `octocat-Hello-World`
+**Recommended:** Use GitHub context variables directly in your secret paths:
 
-The secrets can be accessed via `fromJSON(steps.secrets.outputs.vault).name`,
-where `name` is the variable at the end of every line of the secrets
-(`jf_access_token` in the above example).
+- `${{ github.repository_owner }}` - Repository owner (e.g., `SonarSource`)
+- `${{ github.event.repository.name }}` - Repository name (e.g., `vault-action-wrapper`)
+
+Example recommended pattern:
+
+```text
+development/artifactory/token/${{ github.repository_owner }}-${{ github.event.repository.name }}-test
+```
+
+**Legacy:** The wrapper also supports placeholder replacement for backward compatibility.
+The `secrets` parameter will be pre-processed before passing it to the `vault-action`.
+The following placeholders will be replaced:
+
+- `{GITHUB_REPOSITORY}` => `SonarSource/vault-action-wrapper`
+- `{GITHUB_REPOSITORY_OWNER}` => `SonarSource`
+- `{REPO_NAME}` => `vault-action-wrapper`
+- `{REPO_OWNER_NAME_DASH}` => `SonarSource-vault-action-wrapper`
+
+### Accessing Secrets
+
+**New (Recommended):** Secrets are now available as direct outputs:
+
+```yaml
+env:
+  JF_ACCESS_TOKEN: ${{ steps.secrets.outputs.jf_access_token }}
+```
+
+**Legacy:** Secrets can also be accessed via the vault output object:
+
+```yaml
+env:
+  JF_ACCESS_TOKEN: ${{ fromJSON(steps.secrets.outputs.vault).jf_access_token }}
+```
+
+The variable name corresponds to the identifier at the end of each secrets line (`jf_access_token` in the above example).
 
 ### Permissions
 
@@ -69,12 +102,12 @@ jobs:
       - uses: SonarSource/sonarcloud-github-action@ffc3010689be73b8e5ae0c57ce35968afd7909e8 # v5.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ fromJSON(steps.secrets.outputs.vault).sonarcloud_token }}
+          SONAR_TOKEN: ${{ steps.secrets.outputs.sonarcloud_token }}
 ```
 
 ### Real-world examples
 
-* [View usage within SonarSource GitHub Organization](https://github.com/search?q=org%3ASonarSource+vault-action-wrapper+path%3A.github%2Fworkflows%2F&type=code)
+- [View usage within SonarSource GitHub Organization](https://github.com/search?q=org%3ASonarSource+vault-action-wrapper+path%3A.github%2Fworkflows%2F&type=code)
 
 ## FAQ
 
@@ -82,8 +115,8 @@ jobs:
 
 This error can be raised for multiple reasons:
 
-* the requested secret is wrongly written or does not exist
-* the repository is not granted access to this secret by the RE-team
+- the requested secret is wrongly written or does not exist
+- the repository is not granted access to this secret
 
   Due to security reason, the Vault will not tell it knows something about a
   secret if the user is not granted to reach it.

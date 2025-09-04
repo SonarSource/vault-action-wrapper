@@ -1,17 +1,17 @@
 ---
 name: Wrapper for hashicorp/vault-action
-author: Malena Ebert
+author: Engineering Experience Squad <platform.eng-xp@sonarsource.com>
 description: Simplifies the usage of hashicorp/vault-action
 branding:
   color: green
   icon: lock
 inputs:
   url:
-    description: url of the HC vault instance
+    description: The url of the HashiCorp Vault instance
     default: https://vault.sonar.build
     required: false
   secrets:
-    description: pattern to fetch secrets
+    description: A semicolon-separated list of secrets to retrieve
     required: true
 outputs:
   vault:
@@ -50,7 +50,6 @@ runs:
                 context.repo.repo
               )
           );
-          core.setOutput('vault-role', `github-${context.repo.owner}-${context.repo.repo}`)
     - name: Vault Secrets
       id: secrets
       uses: hashicorp/vault-action@4c06c5ccf5c0761b6029f56cfb1dcf5565918a3b # v3.4.0
@@ -59,5 +58,12 @@ runs:
         exportEnv: false
         method: jwt
         path: jwt-ghwf
-        role: ${{ steps.replace.outputs.vault-role }}
         secrets: ${{ steps.replace.outputs.pattern }}
+        role: github-${{ github.repository_owner }}-${{ github.event.repository.name }}
+    - name: Set individual outputs
+      shell: bash
+      run: |
+        for secret_name in $(echo '${{ toJSON(steps.secrets.outputs) }}' | jq -r 'keys[]'); do
+          secret_value=$(echo '${{ toJSON(steps.secrets.outputs) }}' | jq -r --arg key "$secret_name" '.[$key]')
+          echo "::set-output name=$secret_name::$secret_value"
+        done
