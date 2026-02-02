@@ -13,6 +13,10 @@ inputs:
   secrets:
     description: pattern to fetch secrets
     required: true
+  ttl:
+    description: 'Optional TTL for Vault tokens (e.g., "3h", "10800s"). If not specified, uses the role default.'
+    required: false
+    default: ''
 outputs:
   vault:
     description: Outputs of vault
@@ -28,28 +32,54 @@ runs:
       # REPO_OWNER_NAME_DASH=octocat-Hello-World
       env:
         SECRET_PATTERN: ${{ inputs.secrets }}
+        TTL_INPUT: ${{ inputs.ttl }}
       uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
       with:
         script: |
-          core.setOutput('pattern',
-            process.env.SECRET_PATTERN
-              .replaceAll(
-                '{GITHUB_REPOSITORY_OWNER}',
-                context.repo.owner
-              )
-              .replaceAll(
-                '{GITHUB_REPOSITORY}',
-                `${context.repo.owner}/${context.repo.repo}`
-              )
-              .replaceAll(
-                '{REPO_OWNER_NAME_DASH}',
-                `${context.repo.owner}-${context.repo.repo}`
-              )
-              .replaceAll(
-                '{REPO_NAME}',
-                context.repo.repo
-              )
-          );
+          let pattern = process.env.SECRET_PATTERN
+            .replaceAll(
+              '{GITHUB_REPOSITORY_OWNER}',
+              context.repo.owner
+            )
+            .replaceAll(
+              '{GITHUB_REPOSITORY}',
+              `${context.repo.owner}/${context.repo.repo}`
+            )
+            .replaceAll(
+              '{REPO_OWNER_NAME_DASH}',
+              `${context.repo.owner}-${context.repo.repo}`
+            )
+            .replaceAll(
+              '{REPO_NAME}',
+              context.repo.repo
+            );
+          
+          // Append TTL parameter to each secret path if TTL is specified
+          const ttl = process.env.TTL_INPUT;
+          if (ttl && ttl.length > 0) {
+            // Split by semicolon, append ttl= to each path, rejoin
+            pattern = pattern.split(';').map(line => {
+              line = line.trim();
+              if (line.length === 0) return line;
+              // Check if this line already has parameters
+              const hasParams = line.includes('?') || line.includes(' ttl=');
+              if (hasParams) {
+                // Already has params, append with space
+                return `${line} ttl=${ttl}`;
+              } else {
+                // No params yet, add with space after path
+                const parts = line.split('|');
+                if (parts.length >= 2) {
+                  // Format: path key | VAR_NAME
+                  // Insert ttl before the pipe
+                  return `${parts[0].trim()} ttl=${ttl} | ${parts.slice(1).join('|').trim()}`;
+                }
+                return line;
+              }
+            }).join(';');
+          }
+          
+          core.setOutput('pattern', pattern);
           core.setOutput('vault-role', `github-${context.repo.owner}-${context.repo.repo}`)
     - name: Vault Secrets
       id: secrets

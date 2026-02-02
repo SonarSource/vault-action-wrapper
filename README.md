@@ -16,6 +16,22 @@ This wrapper will select <https://vault.sonar.build> automatically.
 - run: login-command ${{ fromJSON(steps.secrets.outputs.vault).jf_access_token }}
 ```
 
+### Custom TTL
+
+You can optionally specify a custom TTL for token requests:
+
+```yaml
+- name: get secrets with custom TTL
+  id: secrets
+  uses: SonarSource/vault-action-wrapper@v3
+  with:
+    ttl: 3h  # or "10800s"
+    secrets: |
+      development/artifactory/token/{REPO_OWNER_NAME_DASH}-private-reader access_token | ARTIFACTORY_ACCESS_TOKEN;
+```
+
+When `ttl` is specified, it will be appended to each secret path as a parameter (e.g., `path ttl=3h`). This is useful for long-running workflows that need tokens with extended lifetimes.
+
 The `secrets` parameter will be pre-processed before passing it to the
 `vault-action`. The following placeholders will be replaced:
 
