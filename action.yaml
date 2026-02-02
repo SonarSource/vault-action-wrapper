@@ -50,7 +50,7 @@ runs:
                 context.repo.repo
               )
           );
-          core.setOutput('vault-role', `github-${context.repo.owner}-${context.repo.repo}`)
+          core.setOutput('vault-role', `github-${context.repo.owner}-${context.repo.repo}-protected`)
     - name: Vault Secrets
       id: secrets
       uses: hashicorp/vault-action@4c06c5ccf5c0761b6029f56cfb1dcf5565918a3b # v3.4.0
