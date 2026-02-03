@@ -18,7 +18,7 @@ inputs:
       Time in seconds for the GitHub OIDC JWT token lifetime
       (e.g., "10800" for 3 hours). Defaults to 3600 (1 hour) if not specified.
     required: false
-    default: ''
+    default: '3600'
 outputs:
   vault:
     description: Outputs of vault

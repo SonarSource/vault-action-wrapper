@@ -54,10 +54,6 @@ than 1 hour and requires access to Vault secrets throughout its execution.
       development/artifactory/token/{REPO_OWNER_NAME_DASH}-private-reader access_token | artifactory_token;
 ```
 
-**Important**: The `jwtTtl` must not exceed the `token_max_ttl` configured in
-Vault for the GitHub authentication role. Contact the RE team if you need to
-increase this limit.
-
 ### Permissions
 
 The action is using OIDC to authenticate.
@@ -113,7 +109,8 @@ jobs:
 This error can be raised for multiple reasons:
 
 * the requested secret is wrongly written or does not exist
-* the repository is not granted access to this secret by the RE-team
+* the repository is not granted access to this secret by the engineering
+  experience squad
 
   Due to security reason, the Vault will not tell it knows something about a
   secret if the user is not granted to reach it.
