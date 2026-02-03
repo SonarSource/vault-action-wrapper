@@ -54,10 +54,6 @@ than 1 hour and requires access to Vault secrets throughout its execution.
       development/artifactory/token/{REPO_OWNER_NAME_DASH}-private-reader access_token | artifactory_token;
 ```
 
-**Important**: The `jwtTtl` must not exceed the `token_max_ttl` configured in
-Vault for the GitHub authentication role. Contact the engineering experience
-squad if you need to increase this limit.
-
 ### Permissions
 
 The action is using OIDC to authenticate.
