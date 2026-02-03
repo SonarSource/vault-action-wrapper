@@ -28,6 +28,36 @@ The secrets can be accessed via `fromJSON(steps.secrets.outputs.vault).name`,
 where `name` is the variable at the end of every line of the secrets
 (`jf_access_token` in the above example).
 
+### Optional Parameters
+
+#### `jwtTtl`
+
+Controls the lifetime of the GitHub OIDC JWT token used for Vault
+authentication. This directly affects how long the Vault authentication token
+(and any child secret leases) remain valid.
+
+* **Type**: `string`
+* **Default**: Not set (uses hashicorp/vault-action default of 3600 seconds =
+  1 hour)
+* **Example values**: `"10800"` (3 hours), `"7200"` (2 hours)
+
+**When to use**: Set this parameter when your workflow needs to run for longer
+than 1 hour and requires access to Vault secrets throughout its execution.
+
+```yaml
+- name: get secrets for long-running workflow
+  id: secrets
+  uses: SonarSource/vault-action-wrapper@v3
+  with:
+    jwtTtl: "10800"  # 3 hours
+    secrets: |
+      development/artifactory/token/{REPO_OWNER_NAME_DASH}-private-reader access_token | artifactory_token;
+```
+
+**Important**: The `jwtTtl` must not exceed the `token_max_ttl` configured in
+Vault for the GitHub authentication role. Contact the RE team if you need to
+increase this limit.
+
 ### Permissions
 
 The action is using OIDC to authenticate.
