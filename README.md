@@ -28,6 +28,28 @@ The secrets can be accessed via `fromJSON(steps.secrets.outputs.vault).name`,
 where `name` is the variable at the end of every line of the secrets
 (`jf_access_token` in the above example).
 
+### Role Selection
+
+The action automatically selects the Vault JWT role based on `GITHUB_REF`:
+
+* **Protected refs** (`refs/heads/main`, `refs/heads/master`, `refs/heads/branch-*`, `refs/tags/*`) use: `github-{org}-{repo}-protected`
+* **Other refs** (feature branches, pull request refs such as `refs/pull/*/merge`) use: `github-{org}-{repo}`
+
+Note that pull requests always use the non-protected role, even when targeting protected branches like `main` or
+`master`, because their ref (`refs/pull/*/merge`) does not match any protected ref pattern.
+
+This enables branch-based secret protection where sensitive secrets are only accessible from protected branches.
+
+To override automatic role selection, use the `role` input:
+
+```yaml
+- uses: SonarSource/vault-action-wrapper@v3
+  with:
+    role: my-custom-role
+    secrets: |
+      development/kv/data/example token | example_token;
+```
+
 ### Optional Parameters
 
 #### `jwtTtl`
