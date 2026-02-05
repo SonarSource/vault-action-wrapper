@@ -19,6 +19,12 @@ inputs:
       (e.g., "10800" for 3 hours). Defaults to 3600 (1 hour) if not specified.
     required: false
     default: '3600'
+  role:
+    description: |
+      Vault JWT role to use for authentication. If not provided, auto-selects based on GITHUB_REF:
+      - Protected refs (main, master, branch-*, tags/*) use 'github-{org}-{repo}-protected'
+      - Other refs use 'github-{org}-{repo}'
+    required: false
 outputs:
   vault:
     description: Outputs of vault
@@ -34,6 +40,7 @@ runs:
       # REPO_OWNER_NAME_DASH=octocat-Hello-World
       env:
         SECRET_PATTERN: ${{ inputs.secrets }}
+        INPUT_ROLE: ${{ inputs.role }}
       uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
       with:
         script: |
@@ -56,7 +63,32 @@ runs:
                 context.repo.repo
               )
           );
-          core.setOutput('vault-role', `github-${context.repo.owner}-${context.repo.repo}`)
+
+          // Role selection logic
+          const inputRole = process.env.INPUT_ROLE;
+          const baseRole = `github-${context.repo.owner}-${context.repo.repo}`;
+
+          let selectedRole;
+          if (inputRole) {
+            // Use explicit role input (backward compatible)
+            selectedRole = inputRole;
+            core.info(`Using explicit role: ${selectedRole}`);
+          } else {
+            // Auto-select based on GITHUB_REF
+            const ref = process.env.GITHUB_REF || '';
+            const PROTECTED_REF_PATTERNS = [
+              /^refs\/heads\/main$/,
+              /^refs\/heads\/master$/,
+              /^refs\/heads\/branch-.+$/,
+              /^refs\/tags\/.+$/,
+            ];
+            const isProtectedRef = PROTECTED_REF_PATTERNS.some(pattern => pattern.test(ref));
+
+            selectedRole = isProtectedRef ? `${baseRole}-protected` : baseRole;
+            core.info(`Auto-selected role: ${selectedRole} (ref: ${ref}, protected: ${isProtectedRef})`);
+          }
+
+          core.setOutput('vault-role', selectedRole)
     - name: Vault Secrets
       id: secrets
       uses: hashicorp/vault-action@4c06c5ccf5c0761b6029f56cfb1dcf5565918a3b # v3.4.0
