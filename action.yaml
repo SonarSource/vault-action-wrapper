@@ -125,26 +125,39 @@ runs:
           core.info(`Role: ${vaultRole}`);
           core.info('');
           const denied = [];
-          for (const secretPath of secretPaths) {
-            try {
-              const resp = await fetch(`${vaultUrl}/v1/sys/capabilities-self`, {
-                method: 'POST',
-                headers: { 'X-Vault-Token': vaultToken, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ path: secretPath }),
-              });
-              if (resp.ok) {
-                const data = await resp.json();
-                const caps = data.capabilities || [];
+          try {
+            const resp = await fetch(`${vaultUrl}/v1/sys/capabilities-self`, {
+              method: 'POST',
+              headers: {
+                'X-Vault-Token': vaultToken,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ paths: secretPaths }),
+            });
+            if (resp.ok) {
+              const data = await resp.json();
+              for (const secretPath of secretPaths) {
+                const caps = data[secretPath] ?? data.capabilities ?? [];
                 if (caps.includes('deny')) {
                   core.error(`  DENIED  ${secretPath}`);
                   denied.push(secretPath);
-                } else {
+                } else if (caps.length > 0) {
                   core.info(`  OK      ${secretPath} (${caps.join(', ')})`);
+                } else {
+                  core.warning(`  ???     ${secretPath} (no capabilities returned)`);
                 }
-              } else {
+              }
+            } else {
+              core.warning(
+                `Capability check failed with status ${resp.status}; individual results unavailable.`
+              );
+              for (const secretPath of secretPaths) {
                 core.warning(`  ???     ${secretPath} (capability check returned ${resp.status})`);
               }
-            } catch (err) {
+            }
+          } catch (err) {
+            core.warning(`Capability check failed: ${err.message}`);
+            for (const secretPath of secretPaths) {
               core.warning(`  ???     ${secretPath} (${err.message})`);
             }
           }
