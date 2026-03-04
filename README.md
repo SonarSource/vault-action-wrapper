@@ -137,6 +137,30 @@ This error can be raised for multiple reasons:
   Due to security reason, the Vault will not tell it knows something about a
   secret if the user is not granted to reach it.
 
+### Error: Response code 403 (Forbidden)
+
+A `403 Forbidden` error means the Vault role used by the workflow does not have
+permission to read one or more of the requested secrets.
+
+The action automatically diagnoses the failure by checking each secret path
+individually and reports which specific path(s) are denied:
+
+```text
+=== Diagnosing Vault secret access failure ===
+Role: github-SonarSource-my-repo
+
+  OK      development/kv/data/repox (read)
+  DENIED  development/kv/data/slack
+  DENIED  development/artifactory/token/SonarSource-my-repo-promoter
+
+To fix, update the Vault policy for this repository:
+https://github.com/SonarSource/re-terraform-aws-vault/tree/master/orders
+```
+
+To resolve, update the Vault policy in the
+[orders repository](https://github.com/SonarSource/re-terraform-aws-vault/tree/master/orders)
+to grant the repository access to the denied secret paths.
+
 ### Timeout error
 
 Such error could be raised in case the Vault instance is unreachable.

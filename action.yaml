@@ -34,47 +34,26 @@ runs:
   steps:
     - name: replace placeholder
       id: replace
-      # GITHUB_REPOSITORY=octocat/Hello-World
-      # GITHUB_REPOSITORY_OWNER=octocat
-      # REPO_NAME=Hello-World
-      # REPO_OWNER_NAME_DASH=octocat-Hello-World
       env:
         SECRET_PATTERN: ${{ inputs.secrets }}
         INPUT_ROLE: ${{ inputs.role }}
-      uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+      uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea  # v7.0.1
       with:
         script: |
           core.setOutput('pattern',
             process.env.SECRET_PATTERN
-              .replaceAll(
-                '{GITHUB_REPOSITORY_OWNER}',
-                context.repo.owner
-              )
-              .replaceAll(
-                '{GITHUB_REPOSITORY}',
-                `${context.repo.owner}/${context.repo.repo}`
-              )
-              .replaceAll(
-                '{REPO_OWNER_NAME_DASH}',
-                `${context.repo.owner}-${context.repo.repo}`
-              )
-              .replaceAll(
-                '{REPO_NAME}',
-                context.repo.repo
-              )
+              .replaceAll('{GITHUB_REPOSITORY_OWNER}', context.repo.owner)
+              .replaceAll('{GITHUB_REPOSITORY}', `${context.repo.owner}/${context.repo.repo}`)
+              .replaceAll('{REPO_OWNER_NAME_DASH}', `${context.repo.owner}-${context.repo.repo}`)
+              .replaceAll('{REPO_NAME}', context.repo.repo)
           );
-
-          // Role selection logic
           const inputRole = process.env.INPUT_ROLE;
           const baseRole = `github-${context.repo.owner}-${context.repo.repo}`;
-
           let selectedRole;
           if (inputRole) {
-            // Use explicit role input (backward compatible)
             selectedRole = inputRole;
             core.info(`Using explicit role: ${selectedRole}`);
           } else {
-            // Auto-select based on GITHUB_REF
             const ref = process.env.GITHUB_REF || '';
             const PROTECTED_REF_PATTERNS = [
               /^refs\/heads\/main$/,
@@ -82,16 +61,15 @@ runs:
               /^refs\/heads\/branch-.+$/,
               /^refs\/tags\/.+$/,
             ];
-            const isProtectedRef = PROTECTED_REF_PATTERNS.some(pattern => pattern.test(ref));
-
+            const isProtectedRef = PROTECTED_REF_PATTERNS.some(p => p.test(ref));
             selectedRole = isProtectedRef ? `${baseRole}-protected` : baseRole;
             core.info(`Auto-selected role: ${selectedRole} (ref: ${ref}, protected: ${isProtectedRef})`);
           }
-
           core.setOutput('vault-role', selectedRole)
     - name: Vault Secrets
       id: secrets
-      uses: hashicorp/vault-action@4c06c5ccf5c0761b6029f56cfb1dcf5565918a3b # v3.4.0
+      continue-on-error: true
+      uses: hashicorp/vault-action@4c06c5ccf5c0761b6029f56cfb1dcf5565918a3b  # v3.4.0
       with:
         url: ${{ inputs.url }}
         exportEnv: false
@@ -100,3 +78,97 @@ runs:
         role: ${{ steps.replace.outputs.vault-role }}
         secrets: ${{ steps.replace.outputs.pattern }}
         jwtTtl: ${{ inputs.jwtTtl }}
+    - name: Diagnose secret access failures
+      id: diagnose
+      if: steps.secrets.outcome == 'failure'
+      uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea  # v7.0.1
+      env:
+        VAULT_URL: ${{ inputs.url }}
+        VAULT_ROLE: ${{ steps.replace.outputs.vault-role }}
+        SECRET_PATTERN: ${{ steps.replace.outputs.pattern }}
+      with:
+        script: |
+          const vaultUrl = process.env.VAULT_URL.replace(/\/+$/, '');
+          const vaultRole = process.env.VAULT_ROLE;
+          const secretPattern = process.env.SECRET_PATTERN;
+          const secretPaths = [...new Set(
+            secretPattern.split(/[;\n]/).map(l => l.trim()).filter(l => l.length > 0)
+              .map(l => l.split(/\s+/)[0]).filter(p => p.length > 0)
+          )];
+          if (secretPaths.length === 0) {
+            core.setFailed('Vault action failed but could not parse secret paths for diagnosis.');
+            return;
+          }
+          let vaultToken;
+          try {
+            const idToken = await core.getIDToken();
+            const loginResp = await fetch(`${vaultUrl}/v1/auth/jwt-ghwf/login`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ role: vaultRole, jwt: idToken }),
+            });
+            if (!loginResp.ok) {
+              const body = await loginResp.text();
+              const msg = `Cannot diagnose individual secrets — Vault login failed (${loginResp.status}). ` +
+                `The role "${vaultRole}" may not exist or is misconfigured.\n${body}`;
+              core.setFailed(msg);
+              return;
+            }
+            const loginData = await loginResp.json();
+            vaultToken = loginData.auth.client_token;
+          } catch (err) {
+            core.setFailed(`Cannot diagnose individual secrets: ${err.message}`);
+            return;
+          }
+          core.info('');
+          core.info('=== Diagnosing Vault secret access failure ===');
+          core.info(`Role: ${vaultRole}`);
+          core.info('');
+          const denied = [];
+          try {
+            const resp = await fetch(`${vaultUrl}/v1/sys/capabilities-self`, {
+              method: 'POST',
+              headers: {
+                'X-Vault-Token': vaultToken,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ paths: secretPaths }),
+            });
+            if (resp.ok) {
+              const data = await resp.json();
+              for (const secretPath of secretPaths) {
+                const caps = data[secretPath] ?? data.capabilities ?? [];
+                if (caps.includes('deny')) {
+                  core.error(`  DENIED  ${secretPath}`);
+                  denied.push(secretPath);
+                } else if (caps.length > 0) {
+                  core.info(`  OK      ${secretPath} (${caps.join(', ')})`);
+                } else {
+                  core.warning(`  ???     ${secretPath} (no capabilities returned)`);
+                }
+              }
+            } else {
+              core.warning(
+                `Capability check failed with status ${resp.status}; individual results unavailable.`
+              );
+              for (const secretPath of secretPaths) {
+                core.warning(`  ???     ${secretPath} (capability check returned ${resp.status})`);
+              }
+            }
+          } catch (err) {
+            core.warning(`Capability check failed: ${err.message}`);
+            for (const secretPath of secretPaths) {
+              core.warning(`  ???     ${secretPath} (${err.message})`);
+            }
+          }
+          core.info('');
+          if (denied.length > 0) {
+            core.info('To fix, update the Vault policy for this repository:');
+            core.info('https://github.com/SonarSource/re-terraform-aws-vault/tree/master/orders');
+            core.setFailed(`Vault secrets retrieval failed — ${denied.length} path(s) denied: ${denied.join(', ')}`);
+          } else {
+            core.setFailed(
+              'Vault secrets retrieval failed but all paths appear individually accessible. ' +
+              'The error may be transient or caused by a different issue.'
+            );
+          }
