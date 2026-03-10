@@ -91,14 +91,16 @@ runs:
           const vaultUrl = process.env.VAULT_URL.replace(/\/+$/, '');
           const vaultRole = process.env.VAULT_ROLE;
           const secretPattern = process.env.SECRET_PATTERN;
-          const secretPaths = [...new Set(
-            secretPattern.split(/[;\n]/).map(l => l.trim()).filter(l => l.length > 0)
-              .map(l => l.split(/\s+/)[0]).filter(p => p.length > 0)
-          )];
-          if (secretPaths.length === 0) {
-            core.setFailed('Vault action failed but could not parse secret paths for diagnosis.');
-            return;
-          }
+          const runUrl = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}` +
+            `/actions/runs/${process.env.GITHUB_RUN_ID}`;
+          const SUPPORT_CHANNEL = '#ask-squad-eng-xp';
+          const TERRAFORM_REPO = 'https://github.com/SonarSource/re-terraform-aws-vault';
+          const PORT_SELF_SERVICE = 'https://app.getport.io/self-serve?action=manage_vault_policy';
+          const DEBUG_HINT =
+            `To investigate further, use the Claude Code developer-tooling plugin\n` +
+            `(https://github.com/SonarSource/awesome-ai) and run the\n` +
+            `debug-github-actions skill with this workflow run URL:\n` +
+            `  ${runUrl}`;
           let vaultToken;
           try {
             const idToken = await core.getIDToken();
@@ -108,16 +110,48 @@ runs:
               body: JSON.stringify({ role: vaultRole, jwt: idToken }),
             });
             if (!loginResp.ok) {
+              const status = loginResp.status;
               const body = await loginResp.text();
-              const msg = `Cannot diagnose individual secrets — Vault login failed (${loginResp.status}). ` +
-                `The role "${vaultRole}" may not exist or is misconfigured.\n${body}`;
-              core.setFailed(msg);
+              if (status >= 500 && status <= 599) {
+                core.setFailed(
+                  `Vault authentication failed (HTTP ${status}) due to a Vault/server-side error.\n\n` +
+                  `Try rerunning this workflow once.\n` +
+                  `If it still fails, check https://sonarsource-internal.statuspage.io/.\n` +
+                  `If there is no ongoing incident, ask for help in ${SUPPORT_CHANNEL}.\n\n` +
+                  `Details: ${body}`
+                );
+                return;
+              }
+              core.setFailed(
+                `Vault authentication failed (HTTP ${status}) — ` +
+                `the role "${vaultRole}" does not exist or is not authorized.\n\n` +
+                `This usually means the repository has not been onboarded to Vault, ` +
+                `or the Vault role is misconfigured.\n` +
+                `To fix, add or update this repository's Vault role in:\n` +
+                `  ${TERRAFORM_REPO}\n\n` +
+                `${DEBUG_HINT}\n\n` +
+                `If you still need help, ask in ${SUPPORT_CHANNEL}.\n\n` +
+                `Details: ${body}`
+              );
               return;
             }
             const loginData = await loginResp.json();
             vaultToken = loginData.auth.client_token;
           } catch (err) {
-            core.setFailed(`Cannot diagnose individual secrets: ${err.message}`);
+            core.setFailed(
+              `Vault authentication failed — could not obtain a Vault token.\n\n` +
+              `${DEBUG_HINT}\n\n` +
+              `If you still need help, ask in ${SUPPORT_CHANNEL}.\n\n` +
+              `Error: ${err.message}`
+            );
+            return;
+          }
+          const secretPaths = [...new Set(
+            secretPattern.split(/[;\n]/).map(l => l.trim()).filter(l => l.length > 0)
+              .map(l => l.split(/\s+/)[0]).filter(p => p.length > 0)
+          )];
+          if (secretPaths.length === 0) {
+            core.setFailed('Vault action failed but could not parse secret paths for diagnosis.');
             return;
           }
           core.info('');
@@ -163,12 +197,31 @@ runs:
           }
           core.info('');
           if (denied.length > 0) {
-            core.info('To fix, update the Vault policy for this repository:');
-            core.info('https://github.com/SonarSource/re-terraform-aws-vault/tree/master/orders');
-            core.setFailed(`Vault secrets retrieval failed — ${denied.length} path(s) denied: ${denied.join(', ')}`);
+            // All KV secret paths contain '/kv/' in their mount path
+            const deniedKv = denied.filter(p => p.includes('/kv/'));
+            const deniedDynamic = denied.filter(p => !p.includes('/kv/'));
+            let msg = `Vault secret access denied for ${denied.length} path(s).\n\n`;
+            if (deniedKv.length > 0) {
+              msg +=
+                `The following path(s) need a policy update — you can fix this yourself\n` +
+                `using the self-service portal:\n` +
+                `  ${deniedKv.join('\n  ')}\n` +
+                `Grant access here: ${PORT_SELF_SERVICE}\n\n`;
+            }
+            if (deniedDynamic.length > 0) {
+              msg +=
+                `The following path(s) require a Vault policy change — request it\n` +
+                `in the infrastructure repo:\n` +
+                `  ${deniedDynamic.join('\n  ')}\n` +
+                `Update the policy here: ${TERRAFORM_REPO}\n\n`;
+            }
+            msg += `${DEBUG_HINT}\n\n`;
+            msg += `If you still need help, ask in ${SUPPORT_CHANNEL}.`;
+            core.setFailed(msg);
           } else {
             core.setFailed(
-              'Vault secrets retrieval failed but all paths appear individually accessible. ' +
-              'The error may be transient or caused by a different issue.'
+              `Vault secrets retrieval failed but the root cause could not be determined automatically.\n\n` +
+              `${DEBUG_HINT}\n\n` +
+              `If you still need help, ask in ${SUPPORT_CHANNEL}.`
             );
           }
