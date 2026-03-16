@@ -13,7 +13,7 @@ This wrapper will select <https://vault.sonar.build> automatically.
   with:
     secrets: |
       development/artifactory/token/{REPO_OWNER_NAME_DASH}-test access_token | jf_access_token;
-- run: login-command ${{ fromJSON(steps.secrets.outputs.vault).jf_access_token }}
+- run: login-command ${{ steps.secrets.outputs.jf_access_token }}
 ```
 
 The `secrets` parameter will be pre-processed before passing it to the
@@ -24,9 +24,22 @@ The `secrets` parameter will be pre-processed before passing it to the
 * `{REPO_NAME}` => `Hello-World`
 * `{REPO_OWNER_NAME_DASH}` => `octocat-Hello-World`
 
-The secrets can be accessed via `fromJSON(steps.secrets.outputs.vault).name`,
+The secrets can be accessed directly via `steps.secrets.outputs.<name>`,
 where `name` is the variable at the end of every line of the secrets
 (`jf_access_token` in the above example).
+
+### Backward Compatibility (Legacy Syntax)
+
+For workflows using the previous syntax, the `vault` output containing all
+secrets as a JSON object is still supported:
+
+```yaml
+env:
+  # Legacy syntax (still works)
+  JF_ACCESS_TOKEN: ${{ fromJSON(steps.secrets.outputs.vault).jf_access_token }}
+  # New simplified syntax (recommended)
+  JF_ACCESS_TOKEN: ${{ steps.secrets.outputs.jf_access_token }}
+```
 
 ### Permissions
 
@@ -69,7 +82,7 @@ jobs:
       - uses: SonarSource/sonarcloud-github-action@ffc3010689be73b8e5ae0c57ce35968afd7909e8 # v5.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ fromJSON(steps.secrets.outputs.vault).sonarcloud_token }}
+          SONAR_TOKEN: ${{ steps.secrets.outputs.sonarcloud_token }}
 ```
 
 ### Real-world examples
