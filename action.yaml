@@ -78,6 +78,17 @@ runs:
         role: ${{ steps.replace.outputs.vault-role }}
         secrets: ${{ steps.replace.outputs.pattern }}
         jwtTtl: ${{ inputs.jwtTtl }}
+    - name: Expose individual secret outputs
+      if: steps.secrets.outcome == 'success'
+      uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea  # v7.0.1
+      env:
+        VAULT_OUTPUTS: ${{ toJSON(steps.secrets.outputs) }}
+      with:
+        script: |
+          const outputs = JSON.parse(process.env.VAULT_OUTPUTS);
+          for (const [key, value] of Object.entries(outputs)) {
+            core.setOutput(key, value);
+          }
     - name: Diagnose secret access failures
       id: diagnose
       if: steps.secrets.outcome == 'failure'
