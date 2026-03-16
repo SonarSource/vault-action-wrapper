@@ -78,6 +78,31 @@ runs:
         role: ${{ steps.replace.outputs.vault-role }}
         secrets: ${{ steps.replace.outputs.pattern }}
         jwtTtl: ${{ inputs.jwtTtl }}
+    - name: Set individual outputs
+      id: set-outputs
+      if: steps.secrets.outcome == 'success'
+      uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea  # v7.0.1
+      env:
+        VAULT_OUTPUTS: ${{ toJSON(steps.secrets.outputs) }}
+      with:
+        script: |
+          const fs = require('fs');
+          const vaultOutputs = JSON.parse(process.env.VAULT_OUTPUTS);
+          
+          core.info('Setting individual secret outputs for simplified access...');
+          
+          // Set each secret as an individual output
+          for (const [secretName, secretValue] of Object.entries(vaultOutputs)) {
+            core.info(`Setting output: ${secretName}`);
+            // Use modern GitHub Actions output method
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `${secretName}=${secretValue}\n`);
+          }
+          
+          const secretCount = Object.keys(vaultOutputs).length;
+          core.info(`Successfully set ${secretCount} individual secret output(s)`);
+          core.info('Secrets are now available as both:');
+          core.info('  - Individual outputs: steps.{step_id}.outputs.{secret_name}');
+          core.info('  - JSON output (legacy): fromJSON(steps.{step_id}.outputs.vault).{secret_name}');
     - name: Diagnose secret access failures
       id: diagnose
       if: steps.secrets.outcome == 'failure'
