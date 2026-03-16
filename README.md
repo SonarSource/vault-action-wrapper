@@ -4,7 +4,11 @@ Ease the usage of hashicorp/vault-action within Sonar
 
 ## Usage
 
-This wrapper will select <https://vault.sonar.build> automatically.
+This wrapper will select <https://vault.sonar.build> automatically and provides two ways to access retrieved secrets:
+
+### ✨ Simplified Outputs (Recommended)
+
+Starting with version 3.4.0, secrets are available as individual outputs for easier access:
 
 ```yaml
 - name: get secrets
@@ -13,8 +17,50 @@ This wrapper will select <https://vault.sonar.build> automatically.
   with:
     secrets: |
       development/artifactory/token/{REPO_OWNER_NAME_DASH}-test access_token | jf_access_token;
-- run: login-command ${{ fromJSON(steps.secrets.outputs.vault).jf_access_token }}
+      development/kv/data/sonarcloud token | sonarcloud_token;
+- name: use secrets
+  env:
+    JF_ACCESS_TOKEN: ${{ steps.secrets.outputs.jf_access_token }}
+    SONAR_TOKEN: ${{ steps.secrets.outputs.sonarcloud_token }}
+  run: |
+    echo "Using JF token: ${JF_ACCESS_TOKEN}"
+    echo "Using SonarCloud token: ${SONAR_TOKEN}"
 ```
+
+### Legacy JSON Output
+
+The previous JSON-based syntax is still supported for backward compatibility:
+
+```yaml
+- name: get secrets
+  id: secrets  
+  uses: SonarSource/vault-action-wrapper@v3
+  with:
+    secrets: |
+      development/artifactory/token/{REPO_OWNER_NAME_DASH}-test access_token | jf_access_token;
+- name: use secrets (legacy syntax)
+  run: login-command ${{ fromJSON(steps.secrets.outputs.vault).jf_access_token }}
+```
+
+### Migration Guide
+
+To migrate from legacy to simplified syntax:
+
+**Before (legacy):**
+```yaml
+env:
+  JF_ACCESS_TOKEN: ${{ fromJSON(steps.secrets.outputs.vault).jf_access_token }}
+  SONAR_TOKEN: ${{ fromJSON(steps.secrets.outputs.vault).sonarcloud_token }}
+```
+
+**After (simplified):**
+```yaml
+env:
+  JF_ACCESS_TOKEN: ${{ steps.secrets.outputs.jf_access_token }}
+  SONAR_TOKEN: ${{ steps.secrets.outputs.sonarcloud_token }}
+```
+
+### Secret Definition
 
 The `secrets` parameter will be pre-processed before passing it to the
 `vault-action`. The following placeholders will be replaced:
@@ -24,9 +70,11 @@ The `secrets` parameter will be pre-processed before passing it to the
 * `{REPO_NAME}` => `Hello-World`
 * `{REPO_OWNER_NAME_DASH}` => `octocat-Hello-World`
 
-The secrets can be accessed via `fromJSON(steps.secrets.outputs.vault).name`,
-where `name` is the variable at the end of every line of the secrets
-(`jf_access_token` in the above example).
+Secrets can be accessed via:
+- **New syntax:** `steps.{step_id}.outputs.{secret_name}`
+- **Legacy syntax:** `fromJSON(steps.{step_id}.outputs.vault).{secret_name}`
+
+Where `{secret_name}` is the variable name at the end of each secret definition (after the `|` symbol).
 
 ### Role Selection
 
@@ -94,7 +142,33 @@ For further information, see
 
 ## Examples
 
-### SonarCloud Scan
+### SonarCloud Scan (Simplified)
+
+```yaml
+jobs:
+  sonarcloud:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write     # required by SonarSource/vault-action-wrapper
+      contents: read      # required by actions/checkout
+      pull-requests: read # required by SonarSource/sonarcloud-github-action
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          # Disabling shallow clone is recommended for improving relevancy of reporting
+          fetch-depth: 0
+      - id: secrets
+        uses: SonarSource/vault-action-wrapper@v3
+        with:
+          secrets: |
+            development/kv/data/sonarcloud token | sonarcloud_token;
+      - uses: SonarSource/sonarcloud-github-action@ffc3010689be73b8e5ae0c57ce35968afd7909e8 # v5.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ steps.secrets.outputs.sonarcloud_token }}
+```
+
+### SonarCloud Scan (Legacy)
 
 ```yaml
 jobs:
