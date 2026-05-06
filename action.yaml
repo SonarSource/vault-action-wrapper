@@ -93,7 +93,7 @@ runs:
           const secretPattern = process.env.SECRET_PATTERN;
           const runUrl = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}` +
             `/actions/runs/${process.env.GITHUB_RUN_ID}`;
-          const SUPPORT_CHANNEL = '#ask-squad-eng-xp';
+          const SUPPORT_CHANNEL = '#ask-platform-eng-xp';
           const TERRAFORM_REPO = 'https://github.com/SonarSource/re-terraform-aws-vault';
           const PORT_SELF_SERVICE = 'https://app.getport.io/self-serve?action=manage_vault_policy';
           const DEBUG_HINT =
