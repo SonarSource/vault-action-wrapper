@@ -28,7 +28,10 @@ inputs:
 outputs:
   vault:
     description: Outputs of vault
-    value: ${{ toJSON(steps.secrets.outputs) }}
+    value: >-
+      ${{ steps.secrets-retry.outcome == 'success'
+      && toJSON(steps.secrets-retry.outputs)
+      || toJSON(steps.secrets.outputs) }}
 runs:
   using: composite
   steps:
@@ -78,9 +81,28 @@ runs:
         role: ${{ steps.replace.outputs.vault-role }}
         secrets: ${{ steps.replace.outputs.pattern }}
         jwtTtl: ${{ inputs.jwtTtl }}
+    - name: Wait before retry
+      if: steps.secrets.outcome == 'failure'
+      shell: bash
+      run: |
+        echo "::warning::Vault secret retrieval failed on first attempt. Retrying in 10 seconds..."
+        sleep 10
+    - name: Vault Secrets (retry)
+      id: secrets-retry
+      if: steps.secrets.outcome == 'failure'
+      continue-on-error: true
+      uses: hashicorp/vault-action@892a26828f195e65540a40b4768ae4571f51ebfc  # v4.0.0
+      with:
+        url: ${{ inputs.url }}
+        exportEnv: false
+        method: jwt
+        path: jwt-ghwf
+        role: ${{ steps.replace.outputs.vault-role }}
+        secrets: ${{ steps.replace.outputs.pattern }}
+        jwtTtl: ${{ inputs.jwtTtl }}
     - name: Diagnose secret access failures
       id: diagnose
-      if: steps.secrets.outcome == 'failure'
+      if: steps.secrets.outcome == 'failure' && steps.secrets-retry.outcome == 'failure'
       uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9.0.0
       env:
         VAULT_URL: ${{ inputs.url }}
@@ -115,8 +137,8 @@ runs:
               if (status >= 500 && status <= 599) {
                 core.setFailed(
                   `Vault authentication failed (HTTP ${status}) due to a Vault/server-side error.\n\n` +
-                  `Try rerunning this workflow once.\n` +
-                  `If it still fails, check https://sonarsource-internal.statuspage.io/.\n` +
+                  `An automatic retry was already attempted and also failed.\n` +
+                  `Check https://sonarsource-internal.statuspage.io/ for ongoing incidents.\n` +
                   `If there is no ongoing incident, ask for help in ${SUPPORT_CHANNEL}.\n\n` +
                   `Details: ${body}`
                 );
@@ -139,7 +161,8 @@ runs:
             vaultToken = loginData.auth.client_token;
           } catch (err) {
             core.setFailed(
-              `Vault authentication failed — could not obtain a Vault token.\n\n` +
+              `Vault authentication failed — could not obtain a Vault token.\n` +
+              `An automatic retry was already attempted and also failed.\n\n` +
               `${DEBUG_HINT}\n\n` +
               `If you still need help, ask in ${SUPPORT_CHANNEL}.\n\n` +
               `Error: ${err.message}`
