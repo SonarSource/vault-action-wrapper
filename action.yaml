@@ -32,6 +32,9 @@ outputs:
       ${{ steps.secrets-retry.outcome == 'success'
       && toJSON(steps.secrets-retry.outputs)
       || toJSON(steps.secrets.outputs) }}
+  diagnostics:
+    description: Network diagnostics captured when the first Vault attempt fails. Empty on success.
+    value: ${{ steps.netdiag.outputs.text }}
 runs:
   using: composite
   steps:
@@ -100,6 +103,68 @@ runs:
         role: ${{ steps.replace.outputs.vault-role }}
         secrets: ${{ steps.replace.outputs.pattern }}
         jwtTtl: ${{ inputs.jwtTtl }}
+    - name: Capture network diagnostics
+      id: netdiag
+      if: steps.secrets.outcome == 'failure'
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9.0.0
+      env:
+        VAULT_URL: ${{ inputs.url }}
+        FIRST_ATTEMPT_OUTCOME: ${{ steps.secrets.outcome }}
+        RETRY_OUTCOME: ${{ steps.secrets-retry.outcome }}
+      with:
+        script: |
+          const text = await gatherNetworkDiagnostics(process.env.VAULT_URL);
+          core.info(`--- network diagnostics ---\n${text}\n---`);
+          core.setOutput('text', text);
+
+          async function gatherNetworkDiagnostics(targetUrl) {
+            try {
+              const net = require('node:net');
+              let hostname, tcpPort;
+              try {
+                const u = new URL(targetUrl);
+                hostname = u.hostname;
+                tcpPort = Number(u.port) || (u.protocol === 'http:' ? 80 : 443);
+              } catch (e) {
+                return `vault_url=${targetUrl}\nurl_parse=ERROR ${e.message}`;
+              }
+              const lines = [
+                `runner_os=${process.env.RUNNER_OS || ''} ` +
+                `runner_arch=${process.env.RUNNER_ARCH || ''} ` +
+                `runner_name=${process.env.RUNNER_NAME || ''}`,
+                `vault_url=${targetUrl}`,
+                `time=${new Date().toISOString()}`,
+                `first_attempt_outcome=${process.env.FIRST_ATTEMPT_OUTCOME || ''}`,
+                `retry_outcome=${process.env.RETRY_OUTCOME || ''}`,
+              ];
+              const ac = new AbortController();
+              const t = setTimeout(() => ac.abort(), 5000);
+              try {
+                const r = await fetch('https://checkip.amazonaws.com', { signal: ac.signal });
+                lines.push(`egress_ip=${(await r.text()).trim()}`);
+              } catch (e) {
+                lines.push(`egress_ip=ERROR ${e.message}`);
+              } finally {
+                clearTimeout(t);
+              }
+              const probe = (host, p) => new Promise(resolve => {
+                const started = Date.now();
+                const s = net.createConnection({ host, port: p });
+                const finish = (result) => {
+                  try { s.destroy(); } catch {}
+                  resolve(`${result} (${Date.now() - started}ms)`);
+                };
+                s.setTimeout(5000);
+                s.once('connect', () => finish('ok'));
+                s.once('timeout', () => finish('timeout'));
+                s.once('error', (err) => finish(`error ${err.code || err.message}`));
+              });
+              lines.push(`tcp_probe ${hostname}:${tcpPort}=${await probe(hostname, tcpPort)}`);
+              return lines.join('\n');
+            } catch (e) {
+              return `diagnostics=ERROR ${e.message}`;
+            }
+          }
     - name: Diagnose secret access failures
       id: diagnose
       if: steps.secrets.outcome == 'failure' && steps.secrets-retry.outcome == 'failure'
@@ -108,6 +173,7 @@ runs:
         VAULT_URL: ${{ inputs.url }}
         VAULT_ROLE: ${{ steps.replace.outputs.vault-role }}
         SECRET_PATTERN: ${{ steps.replace.outputs.pattern }}
+        NETWORK_DIAGNOSTICS: ${{ steps.netdiag.outputs.text }}
       with:
         script: |
           const vaultUrl = process.env.VAULT_URL.replace(/\/+$/, '');
@@ -160,11 +226,14 @@ runs:
             const loginData = await loginResp.json();
             vaultToken = loginData.auth.client_token;
           } catch (err) {
+            const diagnostics = process.env.NETWORK_DIAGNOSTICS || '(not gathered)';
             core.setFailed(
               `Vault authentication failed — could not obtain a Vault token.\n` +
               `An automatic retry was already attempted and also failed.\n\n` +
+              `If the error below is \`fetch failed\`, the request likely never reached Vault ` +
+              `(network/firewall drop). Include the block below when asking for help in ${SUPPORT_CHANNEL}:\n\n` +
+              `--- network diagnostics ---\n${diagnostics}\n---\n\n` +
               `${DEBUG_HINT}\n\n` +
-              `If you still need help, ask in ${SUPPORT_CHANNEL}.\n\n` +
               `Error: ${err.message}`
             );
             return;
