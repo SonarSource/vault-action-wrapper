@@ -11,7 +11,7 @@ on:
 jobs:
 
   vault-action:
-    runs-on: github-ubuntu-latest-s
+    runs-on: sonar-xs
     permissions:
       id-token: write
       contents: read
@@ -35,3 +35,48 @@ jobs:
         shell: bash
         run: |
           [[ "${{ fromJSON(steps.actual.outputs.vault).org_name }}" = "SonarSource" ]]
+
+  vault-action-failure-diagnostics:
+    runs-on: sonar-xs
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: exec vault-action against unreachable host
+        id: failed
+        continue-on-error: true
+        uses: ./
+        with:
+          url: https://vault.invalid.example.test
+          secrets: |
+            development/github/token/{REPO_OWNER_NAME_DASH}-ro token | github_ro;
+      - name: assert action failed and diagnostics were captured
+        shell: bash
+        env:
+          OUTCOME: ${{ steps.failed.outcome }}
+          DIAGNOSTICS: ${{ steps.failed.outputs.diagnostics }}
+        run: |
+          set -euo pipefail
+          echo "outcome=$OUTCOME"
+          echo "--- diagnostics ---"
+          printf '%s\n' "$DIAGNOSTICS"
+          echo "---"
+          if [[ "$OUTCOME" != "failure" ]]; then
+            echo "expected failure, got $OUTCOME"
+            exit 1
+          fi
+          printf '%s\n' "$DIAGNOSTICS" > /tmp/diagnostics
+          required=(
+            '^runner_os='
+            '^egress_ip='
+            '^tcp_probe vault.invalid.example.test:443='
+            '^first_attempt_outcome=failure'
+            '^retry_outcome=failure'
+          )
+          for pattern in "${required[@]}"; do
+            if ! grep -q "$pattern" /tmp/diagnostics; then
+              echo "missing expected pattern: $pattern"
+              exit 1
+            fi
+          done
