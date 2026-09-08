@@ -1,17 +1,20 @@
-name: Pre-commit checks
 on:
   pull_request:
+  merge_group:
+  push:
+    branches:
+      - master
+
+name: pre-commit
 
 jobs:
   pre-commit:
-    name: "pre-commit"
-    runs-on: github-ubuntu-latest-s
+    runs-on: sonar-xs
+    permissions:
+      id-token: write
+      contents: read
     steps:
-      - uses: SonarSource/gh-action_pre-commit@0ecedc4e4070444a95f6b6714ddc3ebcdde697c4 # 1.1.0
-        env:
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          extra-args: >
-            --from-ref=origin/$BASE_REF
-            --to-ref=$HEAD_SHA
+          fetch-depth: 0
+      - uses: SonarSource/gh-action_pre-commit@v2
