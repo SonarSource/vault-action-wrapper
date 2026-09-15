@@ -72,7 +72,10 @@ runs:
             const isProtectedRef = PROTECTED_REF_PATTERNS.some(p => p.test(ref));
             const useProtected = isProtectedRef && eventName !== 'issue_comment';
             selectedRole = useProtected ? `${baseRole}-protected` : baseRole;
-            core.info(`Auto-selected role: ${selectedRole} (ref: ${ref}, event: ${eventName}, protected: ${useProtected})`);
+            core.info(
+              `Auto-selected role: ${selectedRole}` +
+              ` (ref: ${ref}, event: ${eventName}, protected: ${useProtected})`
+            );
           }
           core.setOutput('vault-role', selectedRole)
     - name: Vault Secrets
