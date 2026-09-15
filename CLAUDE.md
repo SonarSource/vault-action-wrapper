@@ -26,6 +26,9 @@ Auto-selects Vault JWT role based on `GITHUB_REF`:
 For pull request workflows, `GITHUB_REF` is `refs/pull/*/merge`, which does not match any protected patterns, so PRs
 always use the non-protected role.
 
+`issue_comment` always uses the non-protected role: the workflow runs on the default branch, but the protected JWT role
+does not bind that event.
+
 Override with explicit `role` input for backward compatibility.
 
 ## Release

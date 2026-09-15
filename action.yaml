@@ -24,6 +24,7 @@ inputs:
       Vault JWT role to use for authentication. If not provided, auto-selects based on GITHUB_REF:
       - Protected refs (main, master, branch-*, tags/*) use 'github-{org}-{repo}-protected'
       - Other refs use 'github-{org}-{repo}'
+      - issue_comment always uses the non-protected role (the event is not bound on the protected JWT role)
     required: false
 outputs:
   vault:
@@ -61,6 +62,7 @@ runs:
             core.info(`Using explicit role: ${selectedRole}`);
           } else {
             const ref = process.env.GITHUB_REF || '';
+            const eventName = process.env.GITHUB_EVENT_NAME || '';
             const PROTECTED_REF_PATTERNS = [
               /^refs\/heads\/main$/,
               /^refs\/heads\/master$/,
@@ -68,8 +70,12 @@ runs:
               /^refs\/tags\/.+$/,
             ];
             const isProtectedRef = PROTECTED_REF_PATTERNS.some(p => p.test(ref));
-            selectedRole = isProtectedRef ? `${baseRole}-protected` : baseRole;
-            core.info(`Auto-selected role: ${selectedRole} (ref: ${ref}, protected: ${isProtectedRef})`);
+            const useProtected = isProtectedRef && eventName !== 'issue_comment';
+            selectedRole = useProtected ? `${baseRole}-protected` : baseRole;
+            core.info(
+              `Auto-selected role: ${selectedRole}` +
+              ` (ref: ${ref}, event: ${eventName}, protected: ${useProtected})`
+            );
           }
           core.setOutput('vault-role', selectedRole)
     - name: Vault Secrets

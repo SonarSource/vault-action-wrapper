@@ -32,11 +32,15 @@ where `name` is the variable at the end of every line of the secrets
 
 The action automatically selects the Vault JWT role based on `GITHUB_REF`:
 
-* **Protected refs** (`refs/heads/main`, `refs/heads/master`, `refs/heads/branch-*`, `refs/tags/*`) use: `github-{org}-{repo}-protected`
+* **Protected refs** (`refs/heads/main`, `refs/heads/master`, `refs/heads/branch-*`, `refs/tags/*`) use:
+  `github-{org}-{repo}-protected`
 * **Other refs** (feature branches, pull request refs such as `refs/pull/*/merge`) use: `github-{org}-{repo}`
 
 Note that pull requests always use the non-protected role, even when targeting protected branches like `main` or
 `master`, because their ref (`refs/pull/*/merge`) does not match any protected ref pattern.
+
+`issue_comment` also always uses the non-protected role. Those workflows run from the default branch (so `GITHUB_REF`
+looks protected), but the protected Vault JWT role does not bind that event.
 
 This enables branch-based secret protection where sensitive secrets are only accessible from protected branches.
 
