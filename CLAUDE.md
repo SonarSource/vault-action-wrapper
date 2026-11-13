@@ -20,8 +20,8 @@ Integration tests in `.github/workflows/test.yaml` run against staging Vault on 
 
 Auto-selects Vault JWT role based on `GITHUB_REF`:
 
-- Protected refs (`main`, `master`, `branch-*`, `tags/*`) → `github-{org}-{repo}-protected`
-- Other refs → `github-{org}-{repo}`
+- Protected refs (`main`, `master`, `branch-*`) → `github-{org}-{repo}-protected`
+- Other refs, tags included → `github-{org}-{repo}`
 
 On a protected ref other than `main` and `master`, a third attempt uses `github-{org}-{repo}` when both attempts with the
 protected role failed (for example a repository whose protected role only binds `master`). It only returns the secrets
