@@ -22,7 +22,9 @@ inputs:
   role:
     description: |
       Vault JWT role to use for authentication. If not provided, auto-selects based on GITHUB_REF:
-      - Protected refs (main, master, branch-*, tags/*) use 'github-{org}-{repo}-protected'
+      - Protected refs (main, master, branch-*, tags/*) use 'github-{org}-{repo}-protected'. On a protected ref other
+        than main and master, a third attempt uses 'github-{org}-{repo}' when both attempts with the protected role
+        failed; it only returns the secrets that the base role can read.
       - Other refs use 'github-{org}-{repo}'
       - issue_comment always uses the non-protected role (the event is not bound on the protected JWT role)
     required: false
@@ -30,7 +32,9 @@ outputs:
   vault:
     description: Outputs of vault
     value: >-
-      ${{ steps.secrets-retry.outcome == 'success'
+      ${{ steps.secrets-fallback.outcome == 'success'
+      && toJSON(steps.secrets-fallback.outputs)
+      || steps.secrets-retry.outcome == 'success'
       && toJSON(steps.secrets-retry.outputs)
       || toJSON(steps.secrets.outputs) }}
   diagnostics:
@@ -57,6 +61,7 @@ runs:
           const inputRole = process.env.INPUT_ROLE;
           const baseRole = `github-${context.repo.owner}-${context.repo.repo}`;
           let selectedRole;
+          let fallbackRole = '';
           if (inputRole) {
             selectedRole = inputRole;
             core.info(`Using explicit role: ${selectedRole}`);
@@ -72,12 +77,15 @@ runs:
             const isProtectedRef = PROTECTED_REF_PATTERNS.some(p => p.test(ref));
             const useProtected = isProtectedRef && eventName !== 'issue_comment';
             selectedRole = useProtected ? `${baseRole}-protected` : baseRole;
+            const isDefaultBranch = /^refs\/heads\/(main|master)$/.test(ref);
+            if (useProtected && !isDefaultBranch) fallbackRole = baseRole;
             core.info(
               `Auto-selected role: ${selectedRole}` +
               ` (ref: ${ref}, event: ${eventName}, protected: ${useProtected})`
             );
           }
           core.setOutput('vault-role', selectedRole)
+          core.setOutput('fallback-role', fallbackRole)
     - name: Vault Secrets
       id: secrets
       continue-on-error: true
@@ -107,6 +115,28 @@ runs:
         method: jwt
         path: jwt-ghwf
         role: ${{ steps.replace.outputs.vault-role }}
+        secrets: ${{ steps.replace.outputs.pattern }}
+        jwtTtl: ${{ inputs.jwtTtl }}
+    - name: Warn before base role fallback
+      if: steps.secrets-retry.outcome == 'failure' && steps.replace.outputs.fallback-role != ''
+      shell: bash
+      env:
+        FIRST_ROLE: ${{ steps.replace.outputs.vault-role }}
+        FALLBACK_ROLE: ${{ steps.replace.outputs.fallback-role }}
+      run: |
+        echo "::warning::Vault role ${FIRST_ROLE} failed twice. Trying role ${FALLBACK_ROLE}:" \
+          "secrets that only the protected role can read stay unavailable."
+    - name: Vault Secrets (base role fallback)
+      id: secrets-fallback
+      if: steps.secrets-retry.outcome == 'failure' && steps.replace.outputs.fallback-role != ''
+      continue-on-error: true
+      uses: hashicorp/vault-action@892a26828f195e65540a40b4768ae4571f51ebfc  # v4.0.0
+      with:
+        url: ${{ inputs.url }}
+        exportEnv: false
+        method: jwt
+        path: jwt-ghwf
+        role: ${{ steps.replace.outputs.fallback-role }}
         secrets: ${{ steps.replace.outputs.pattern }}
         jwtTtl: ${{ inputs.jwtTtl }}
     - name: Capture network diagnostics
@@ -173,11 +203,13 @@ runs:
           }
     - name: Diagnose secret access failures
       id: diagnose
-      if: steps.secrets.outcome == 'failure' && steps.secrets-retry.outcome == 'failure'
+      if: >-
+        steps.secrets.outcome == 'failure' && steps.secrets-retry.outcome == 'failure'
+        && steps.secrets-fallback.outcome != 'success'
       uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9.0.0
       env:
         VAULT_URL: ${{ inputs.url }}
-        VAULT_ROLE: ${{ steps.replace.outputs.vault-role }}
+        VAULT_ROLE: ${{ steps.replace.outputs.fallback-role || steps.replace.outputs.vault-role }}
         SECRET_PATTERN: ${{ steps.replace.outputs.pattern }}
         NETWORK_DIAGNOSTICS: ${{ steps.netdiag.outputs.text }}
       with:
