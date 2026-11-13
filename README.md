@@ -33,7 +33,9 @@ where `name` is the variable at the end of every line of the secrets
 The action automatically selects the Vault JWT role based on `GITHUB_REF`:
 
 * **Protected refs** (`refs/heads/main`, `refs/heads/master`, `refs/heads/branch-*`, `refs/tags/*`) use:
-  `github-{org}-{repo}-protected`
+  `github-{org}-{repo}-protected`. On a protected ref other than `main` and `master`, a third attempt uses
+  `github-{org}-{repo}` when both attempts with the protected role failed; it only returns the secrets that the base
+  role can read, so a pattern with a protected-only path still fails.
 * **Other refs** (feature branches, pull request refs such as `refs/pull/*/merge`) use: `github-{org}-{repo}`
 
 Note that pull requests always use the non-protected role, even when targeting protected branches like `main` or
