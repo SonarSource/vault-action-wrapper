@@ -22,10 +22,10 @@ inputs:
   role:
     description: |
       Vault JWT role to use for authentication. If not provided, auto-selects based on GITHUB_REF:
-      - Protected refs (main, master, branch-*, tags/*) use 'github-{org}-{repo}-protected'. On a protected ref other
-        than main and master, a third attempt uses 'github-{org}-{repo}' when both attempts with the protected role
+      - Protected refs (main, master, branch-*) use 'github-{org}-{repo}-protected'. On a protected ref other than
+        main and master, a third attempt uses 'github-{org}-{repo}' when both attempts with the protected role
         failed; it only returns the secrets that the base role can read.
-      - Other refs use 'github-{org}-{repo}'
+      - Other refs, tags included, use 'github-{org}-{repo}'
       - issue_comment always uses the non-protected role (the event is not bound on the protected JWT role)
     required: false
 outputs:
@@ -72,7 +72,6 @@ runs:
               /^refs\/heads\/main$/,
               /^refs\/heads\/master$/,
               /^refs\/heads\/branch-.+$/,
-              /^refs\/tags\/.+$/,
             ];
             const isProtectedRef = PROTECTED_REF_PATTERNS.some(p => p.test(ref));
             const useProtected = isProtectedRef && eventName !== 'issue_comment';
